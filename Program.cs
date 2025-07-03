@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using SentinelDoCloudinho.Services;
+using SentinelDoCloudinho.Services; // ou seu namespace correto
 using SentinelDoCloudinho.Services.Hubs;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddHttpClient();
 builder.Services.AddSignalR();
 builder.Services.AddScoped<SecurityTestService>();
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 
@@ -29,3 +29,4 @@ app.MapHub<TestHub>("/testHub");
 app.MapFallbackToPage("/_Host");
 
 app.Run();
+
