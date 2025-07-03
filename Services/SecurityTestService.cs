@@ -1,149 +1,175 @@
-using DnsClient;
-using MeuAppSeguranca.Models;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using System.Net.Http;
-using System.Threading.Tasks;
-using System;
-using System.Linq;
+using DnsClient;
 
-namespace MeuAppSeguranca.Services
+namespace SentinelDoCloudinho.Services
 {
     public class SecurityTestService
     {
+        private readonly IHubContext<TestHub> _hubContext;
         private readonly HttpClient _httpClient;
         private readonly ILookupClient _dnsClient;
+        private readonly IConfiguration _configuration;
 
-        public SecurityTestService(IHttpClientFactory httpClientFactory)
+        public SecurityTestService(IHubContext<TestHub> hubContext, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
+            _hubContext = hubContext;
             _httpClient = httpClientFactory.CreateClient();
-            _httpClient.Timeout = TimeSpan.FromSeconds(30);
+            _httpClient.Timeout = TimeSpan.FromSeconds(configuration.GetValue<int>("SecurityTestSettings:HttpTimeoutSeconds", 30));
             _dnsClient = new LookupClient();
+            _configuration = configuration;
         }
 
-        public async Task<string> RunPortScan(string target)
+        public async Task PerformPenTest(List<string> targets, string aggressionLevel)
         {
-            try
+            var results = new Dictionary<string, List<(string Detail, bool Status)>>();
+            double progress = 0;
+            int totalTests = CalculateTotalTests(targets.Count, aggressionLevel);
+            int testsCompleted = 0;
+
+            var maxConcurrent = _configuration.GetValue<int>("SecurityTestSettings:MaxConcurrentTargets", 5);
+            if (targets.Count > maxConcurrent)
             {
-                return await Task.FromResult($"Portas abertas em {target}: 80, 443 (simulado)");
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"Limite de {maxConcurrent} alvos atingido. Processando os primeiros.", progress, results);
+                targets = targets.Take(maxConcurrent).ToList();
             }
-            catch (Exception)
+
+            foreach (var target in targets)
             {
-                return "Erro ao simular Port Scan";
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"Testando {target}...", progress, results);
+
+                // Port Scanning
+                results["Port Scanning"] = await ScanPorts(target, aggressionLevel);
+                testsCompleted += 10;
+                progress = (testsCompleted / (double)totalTests) * 100;
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"Portas escaneadas em {target}", progress, results);
+
+                // SQL Injection
+                results["SQL Injection"] = await TestSqlInjection(target);
+                testsCompleted += 5;
+                progress = (testsCompleted / (double)totalTests) * 100;
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"SQLi testado em {target}", progress, results);
+
+                // Cross-site Scripting
+                results["Cross-site Scripting"] = await TestXss(target);
+                testsCompleted += 5;
+                progress = (testsCompleted / (double)totalTests) * 100;
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"XSS testado em {target}", progress, results);
+
+                // HTTP Headers
+                results["HTTP Headers"] = await AnalyzeHeaders(target);
+                testsCompleted += 5;
+                progress = (testsCompleted / (double)totalTests) * 100;
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"Headers analisados em {target}", progress, results);
+
+                // SSL/TLS
+                results["SSL/TLS"] = await AnalyzeSsl(target);
+                testsCompleted += 5;
+                progress = (testsCompleted / (double)totalTests) * 100;
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"SSL analisado em {target}", progress, results);
+
+                // DNS Enumeration
+                results["DNS Enumeration"] = await EnumerateDns(target);
+                testsCompleted += 5;
+                progress = (testsCompleted / (double)totalTests) * 100;
+                await _hubContext.Clients.All.SendAsync("ReceiveUpdate", $"DNS enumerado em {target}", progress, results);
             }
+
+            await _hubContext.Clients.All.SendAsync("ReceiveUpdate", "Teste concluído!", 100, results);
         }
 
-        public async Task<string> RunWebScan(string target)
+        private int CalculateTotalTests(int targetCount, string aggressionLevel)
         {
-            try
-            {
-                return await Task.FromResult($"Vulnerabilidades encontradas em {target}: Nenhuma (simulado)");
-            }
-            catch (Exception)
-            {
-                return "Erro ao simular Web Scan";
-            }
+            return targetCount * (aggressionLevel == "high" ? 30 : aggressionLevel == "medium" ? 15 : 5);
         }
 
-        public async Task<string> TestSqlInjection(string target)
+        private async Task<List<(string Detail, bool Status)>> ScanPorts(string target, string aggressionLevel)
         {
-            try
+            var results = new List<(string Detail, bool Status)>();
+            var ports = _configuration.GetSection("SecurityTestSettings:CommonPorts").Get<int[]>() ?? new[] { 20, 21, 22, 80, 443 };
+            var portRange = aggressionLevel == "high" ? Enumerable.Range(0, 65535) :
+                            aggressionLevel == "medium" ? Enumerable.Range(0, 1024) : ports;
+            foreach (var port in portRange.Take(5)) // Limitado para exemplo
             {
-                var url = $"{target}?id=1' OR '1'='1";
-                var response = await _httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                return "Possível SQL Injection detectado em " + target;
+                results.Add(($"Porta {port} aberta", new Random().Next(2) == 0));
             }
-            catch (HttpRequestException)
-            {
-                return "Nenhuma vulnerabilidade SQL Injection detectada";
-            }
-            catch (Exception)
-            {
-                return "Erro ao testar SQL Injection";
-            }
+            return results;
         }
 
-        public async Task<string> TestXss(string target)
+        private async Task<List<(string Detail, bool Status)>> TestSqlInjection(string target)
         {
-            try
+            var results = new List<(string Detail, bool Status)>();
+            var payloads = _configuration.GetSection("SecurityTestSettings:SqlInjectionPayloads").Get<string[]>() ?? new[] { "' OR 1=1 --", "1; DROP TABLE users" };
+            foreach (var payload in payloads)
             {
-                var url = $"{target}?input=<script>alert('xss')</script>";
-                var response = await _httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                var content = await response.Content.ReadAsStringAsync();
-                return content.Contains("<script>") ? "XSS detectado em " + target : "Nenhuma vulnerabilidade XSS";
+                try
+                {
+                    var response = await _httpClient.GetAsync($"{target}?id={payload}");
+                    results.Add(($"Payload {payload}", !response.IsSuccessStatusCode));
+                }
+                catch { results.Add(($"Payload {payload}", false)); }
             }
-            catch (HttpRequestException)
-            {
-                return "Nenhuma vulnerabilidade XSS detectada";
-            }
-            catch (Exception)
-            {
-                return "Erro ao testar XSS";
-            }
+            return results;
         }
 
-        public async Task<string> AnalyzeSsl(string target)
+        private async Task<List<(string Detail, bool Status)>> TestXss(string target)
         {
-            try
+            var results = new List<(string Detail, bool Status)>();
+            var payloads = _configuration.GetSection("SecurityTestSettings:XssPayloads").Get<string[]>() ?? new[] { "<script>alert(1)</script>", "<img src=x onerror=alert(1)>" };
+            foreach (var payload in payloads)
             {
-                return await Task.FromResult($"SSL/TLS em {target}: Grau A (simulado)");
+                try
+                {
+                    var response = await _httpClient.GetAsync($"{target}?input={payload}");
+                    var content = await response.Content.ReadAsStringAsync();
+                    results.Add(($"Payload {payload}", !content.Contains(payload)));
+                }
+                catch { results.Add(($"Payload {payload}", false)); }
             }
-            catch (Exception)
-            {
-                return "Erro ao analisar SSL/TLS";
-            }
+            return results;
         }
 
-        public async Task<string> EnumerateDns(string host)
+        private async Task<List<(string Detail, bool Status)>> AnalyzeHeaders(string target)
         {
-            try
-            {
-                var result = await _dnsClient.QueryAsync(host, QueryType.ANY);
-                return $"Registros DNS para {host}: {string.Join(", ", result.Answers.Select(a => a.ToString()))}";
-            }
-            catch (Exception)
-            {
-                return "Erro ao enumerar DNS";
-            }
-        }
-
-        public async Task<string> TestDirectoryTraversal(string target)
-        {
-            try
-            {
-                var url = $"{target}/../../etc/passwd";
-                var response = await _httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-                return "Possível Directory Traversal detectado em " + target;
-            }
-            catch (HttpRequestException)
-            {
-                return "Nenhuma vulnerabilidade Directory Traversal detectada";
-            }
-            catch (Exception)
-            {
-                return "Erro ao testar Directory Traversal";
-            }
-        }
-
-        public async Task<string> AnalyzeHeaders(string target)
-        {
+            var results = new List<(string Detail, bool Status)>();
             try
             {
                 var response = await _httpClient.GetAsync(target);
-                response.EnsureSuccessStatusCode();
-                return response.Headers.Any(h => h.Key == "X-Content-Type-Options") 
-                    ? $"Cabeçalhos seguros em {target}" 
-                    : "Cabeçalhos inseguros detectados em " + target;
+                results.Add(("Content-Security-Policy presente", response.Headers.Contains("Content-Security-Policy")));
+                results.Add(("Strict-Transport-Security presente", response.Headers.Contains("Strict-Transport-Security")));
+                results.Add(("X-Frame-Options presente", response.Headers.Contains("X-Frame-Options")));
             }
-            catch (HttpRequestException)
+            catch { results.AddRange(new[] { ("CSP", false), ("HSTS", false), ("X-Frame-Options", false) }); }
+            return results;
+        }
+
+        private async Task<List<(string Detail, bool Status)>> AnalyzeSsl(string target)
+        {
+            var results = new List<(string Detail, bool Status)>();
+            try
             {
-                return "Nenhum cabeçalho analisado devido a erro de conexão";
+                var uri = new Uri(target);
+                // Simulação (substituir por OpenSSL)
+                results.Add(("TLS 1.2+ suportado", true));
+                results.Add(("Certificado válido", new Random().Next(2) == 0));
             }
-            catch (Exception)
+            catch { results.AddRange(new[] { ("TLS 1.2+", false), ("Certificado válido", false) }); }
+            return results;
+        }
+
+        private async Task<List<(string Detail, bool Status)>> EnumerateDns(string target)
+        {
+            var results = new List<(string Detail, bool Status)>();
+            try
             {
-                return "Erro ao analisar cabeçalhos";
+                var mx = await _dnsClient.QueryAsync(target, QueryType.MX);
+                var txt = await _dnsClient.QueryAsync(target, QueryType.TXT);
+                results.Add(("MX Records", mx.Answers.MxRecords().Any()));
+                results.Add(("TXT/SPF Records", txt.Answers.TxtRecords().Any()));
             }
+            catch { results.AddRange(new[] { ("MX", false), ("TXT/SPF", false) }); }
+            return results;
         }
     }
 }

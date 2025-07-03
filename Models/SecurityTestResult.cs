@@ -1,14 +1,8 @@
-namespace MeuAppSeguranca.Models
+namespace SentinelDoCloudinho.Models
 {
     public class SecurityTestResult
     {
-        public string PortScanResult { get; set; } = "Não implementado";
-        public string WebScanResult { get; set; } = "Não implementado";
-        public string SqlInjectionResult { get; set; } = "Não implementado";
-        public string XssResult { get; set; } = "Não implementado";
-        public string SslResult { get; set; } = "Não implementado";
-        public string DnsResult { get; set; } = "Não implementado";
-        public string TraversalResult { get; set; } = "Não implementado";
-        public string HeaderResult { get; set; } = "Não implementado";
+        public string Category { get; set; }
+        public List<(string Detail, bool Status)> Details { get; set; }
     }
 }
