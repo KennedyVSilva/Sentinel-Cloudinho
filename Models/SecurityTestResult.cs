@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SentinelDoCloudinho.Models
 {
     public class SecurityTestResult

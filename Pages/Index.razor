@@ -17,7 +17,7 @@
                     <option value="high">Alto</option>
                 </select>
             </div>
-            <button @onclick="StartTest" class="bg-blue-600 p-2 rounded hover:bg-blue-700 disabled:bg-gray-500" disabled="@!TargetsValid">Iniciar Teste</button>
+            <button @onclick="StartTest" class="bg-blue-600 p-2 rounded hover:bg-blue-700 disabled:bg-gray-500" disabled="@( !TargetsValid )">Iniciar Teste</button>
         </div>
         <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
             <h2 class="text-xl mb-2">Progresso</h2>
@@ -131,3 +131,4 @@
             }
         }
     }
+</div>

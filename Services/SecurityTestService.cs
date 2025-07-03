@@ -1,7 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Threading.Tasks;
+using DnsClient;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
-using System.Net.Http;
-using DnsClient;
+using SentinelDoCloudinho.Services.Hubs;
 
 namespace SentinelDoCloudinho.Services
 {
