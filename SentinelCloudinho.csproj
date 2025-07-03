@@ -5,9 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Pacotes essenciais para SignalR Client e Json Protocol -->
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.Json" Version="8.0.7" />
+    <PackageReference Include="DnsClient" Version="1.7.0" />
   </ItemGroup>
 
 </Project>
