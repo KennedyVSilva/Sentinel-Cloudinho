@@ -1,4 +1,5 @@
 @page "/"
+@layout MainLayout
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.SignalR.Client
 @inject IJSRuntime JS
@@ -41,32 +42,35 @@ else
 
         <div class="mt-4 bg-gray-800 p-4 rounded-lg shadow-lg">
             <h2 class="text-xl mb-2">Resultados</h2>
-            @foreach (var category in Results)
+            @if (Results.Any())
             {
-                <div class="mb-4">
-                    <h3 class="text-lg font-semibold">@category.Key</h3>
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="bg-gray-700">
-                                <th class="p-2">Detalhe</th>
-                                <th class="p-2">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var result in category.Value)
-                            {
-                                <tr class="border-t border-gray-600">
-                                    <td class="p-2">@result.Detail</td>
-                                    <td class="p-2 @(result.Status ? "text-green-500" : "text-red-500")">@(result.Status ? "Passou" : "Falhou")</td>
+                @foreach (var category in Results)
+                {
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold">@category.Key</h3>
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="bg-gray-700">
+                                    <th class="p-2">Detalhe</th>
+                                    <th class="p-2">Status</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
+                            </thead>
+                            <tbody>
+                                @foreach (var result in category.Value)
+                                {
+                                    <tr class="border-t border-gray-600">
+                                        <td class="p-2">@result.Detail</td>
+                                        <td class="p-2 @(result.Status ? "text-green-500" : "text-red-500")">@(result.Status ? "Passou" : "Falhou")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
 
-            <canvas id="securityChart" class="mt-4 max-w-full"></canvas>
-            <button @onclick="ExportReport" class="bg-green-600 p-2 rounded hover:bg-green-700 mt-2">Exportar Relatório (JSON/PDF)</button>
+                <canvas id="securityChart" class="mt-4 max-w-full"></canvas>
+                <button @onclick="ExportReport" class="bg-green-600 p-2 rounded hover:bg-green-700 mt-2">Exportar Relatório (JSON/PDF)</button>
+            }
         </div>
     </div>
 }
@@ -141,7 +145,7 @@ else
             StateHasChanged();
         }
 
-        if (Results.Any())
+        if (initialized && Results.Any())
         {
             var labels = Results.Keys.ToArray();
             var data = Results.Values.SelectMany(v => v.Select(r => r.Status ? 1 : 0)).ToArray();
