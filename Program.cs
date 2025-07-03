@@ -1,5 +1,9 @@
+using SentinelDoCloudinho.Services;
+using SentinelDoCloudinho.Services.Hubs;
+
 var builder = WebApplication.CreateBuilder(args);
 
+// Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSignalR();
@@ -17,7 +21,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
+
 app.MapBlazorHub();
 app.MapHub<TestHub>("/testHub");
 app.MapFallbackToPage("/_Host");

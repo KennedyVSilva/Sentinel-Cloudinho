@@ -1,4 +1,7 @@
 @page "/"
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
+
 <div class="min-h-screen bg-gray-900 text-white p-6">
     <h1 class="text-3xl font-bold mb-4">Sentinel do Cloudinho</h1>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -55,80 +58,80 @@
         <canvas id="securityChart" class="mt-4 max-w-full"></canvas>
         <button @onclick="ExportReport" class="bg-green-600 p-2 rounded hover:bg-green-700 mt-2">Exportar Relatório (JSON/PDF)</button>
     </div>
+</div>
 
-    @code {
-        private string Targets { get; set; } = "";
-        private string AggressionLevel { get; set; } = "medium";
-        private double Progress { get; set; }
-        private string LogText { get; set; } = "";
-        private Dictionary<string, List<(string Detail, bool Status)>> Results { get; set; } = new();
-        private bool TargetsValid { get; set; }
-        private string InvalidTargetsClass => !TargetsValid ? "border-red-500" : "";
-        private string ValidationMessage { get; set; } = "";
+@code {
+    private string Targets { get; set; } = "";
+    private string AggressionLevel { get; set; } = "medium";
+    private double Progress { get; set; }
+    private string LogText { get; set; } = "";
+    private Dictionary<string, List<(string Detail, bool Status)>> Results { get; set; } = new();
+    private bool TargetsValid { get; set; }
+    private string InvalidTargetsClass => !TargetsValid ? "border-red-500" : "";
+    private string ValidationMessage { get; set; } = "";
 
-        private void ValidateTargets()
+    private void ValidateTargets()
+    {
+        var targets = Targets.Split(',').Select(t => t.Trim()).ToList();
+        TargetsValid = targets.Any(t => IsValidTarget(t));
+        ValidationMessage = TargetsValid ? "" : "Pelo menos um alvo válido é necessário (URL, IP ou hostname).";
+    }
+
+    private bool IsValidTarget(string target)
+    {
+        if (Uri.TryCreate(target, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+            return true;
+        if (System.Net.IPAddress.TryParse(target, out _))
+            return true;
+        if (!string.IsNullOrWhiteSpace(target) && target.Split('.').Length > 1)
+            return true;
+        return false;
+    }
+
+    private async Task StartTest()
+    {
+        var targets = Targets.Split(',').Select(t => t.Trim()).Where(t => IsValidTarget(t)).ToList();
+        if (!targets.Any()) { LogText = "Nenhum alvo válido."; return; }
+
+        Results.Clear();
+        LogText = "Teste iniciado...";
+        Progress = 0;
+
+        var hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/testHub"))
+            .Build();
+
+        hubConnection.On<string, double, Dictionary<string, List<(string, bool)>>>("ReceiveUpdate", (log, progress, results) =>
         {
-            var targets = Targets.Split(',').Select(t => t.Trim()).ToList();
-            TargetsValid = targets.Any(t => IsValidTarget(t));
-            ValidationMessage = TargetsValid ? "" : "Pelo menos um alvo válido é necessário (URL, IP ou hostname).";
-        }
+            LogText = log;
+            Progress = progress;
+            Results = results;
+            InvokeAsync(StateHasChanged);
+        });
 
-        private bool IsValidTarget(string target)
+        await hubConnection.StartAsync();
+        await hubConnection.InvokeAsync("StartPenTest", targets, AggressionLevel);
+    }
+
+    private async Task ExportReport()
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(Results);
+        var fileName = "sentinel_report.json";
+        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        await JS.InvokeVoidAsync("downloadFile", fileName, bytes);
+
+        // PDF (a implementar com iTextSharp ou outra lib)
+        // var pdfBytes = GeneratePdfReport();
+        // await JS.InvokeVoidAsync("downloadFile", "sentinel_report.pdf", pdfBytes);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Results.Any())
         {
-            if (Uri.TryCreate(target, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-                return true;
-            if (System.Net.IPAddress.TryParse(target, out _))
-                return true;
-            if (!string.IsNullOrWhiteSpace(target) && target.Split('.').Length > 1)
-                return true;
-            return false;
-        }
-
-        private async Task StartTest()
-        {
-            var targets = Targets.Split(',').Select(t => t.Trim()).Where(t => IsValidTarget(t)).ToList();
-            if (!targets.Any()) { LogText = "Nenhum alvo válido."; return; }
-
-            Results.Clear();
-            LogText = "Teste iniciado...";
-            Progress = 0;
-
-            var hubConnection = new HubConnectionBuilder()
-                .WithUrl(NavigationManager.ToAbsoluteUri("/testHub"))
-                .Build();
-
-            hubConnection.On<string, double, Dictionary<string, List<(string, bool)>>>("ReceiveUpdate", (log, progress, results) =>
-            {
-                LogText = log;
-                Progress = progress;
-                Results = results;
-                StateHasChanged();
-            });
-
-            await hubConnection.StartAsync();
-            await hubConnection.InvokeAsync("StartPenTest", targets, AggressionLevel);
-        }
-
-        private async Task ExportReport()
-        {
-            var json = System.Text.Json.JsonSerializer.Serialize(Results);
-            var fileName = "sentinel_report.json";
-            var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-            await JS.InvokeVoidAsync("downloadFile", fileName, bytes);
-
-            // PDF (a implementar com iTextSharp)
-            // var pdfBytes = GeneratePdfReport();
-            // await JS.InvokeVoidAsync("downloadFile", "sentinel_report.pdf", pdfBytes);
-        }
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (firstRender && Results.Any())
-            {
-                var labels = Results.Keys.ToArray();
-                var data = Results.Values.SelectMany(v => v.Select(r => r.Status ? 1 : 0)).ToArray();
-                await JS.InvokeVoidAsync("initializeChart", "securityChart", labels, data);
-            }
+            var labels = Results.Keys.ToArray();
+            var data = Results.Values.SelectMany(v => v.Select(r => r.Status ? 1 : 0)).ToArray();
+            await JS.InvokeVoidAsync("initializeChart", "securityChart", labels, data);
         }
     }
-</div>
+}
