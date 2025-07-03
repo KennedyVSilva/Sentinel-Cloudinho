@@ -5,8 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.Json" Version="8.0.0" />
+
+    <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="8.0.7" /> <!-- Verifique a versão mais recente -->
+    <PackageReference Include="DnsClient" Version="1.7.0" />
+    <PackageReference Include="iText7" Version="8.0.2" /> <!-- Substitua iTextSharp por iText7, ajuste a versão -->
+
   </ItemGroup>
 
 </Project>
