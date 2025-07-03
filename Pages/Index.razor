@@ -1,5 +1,8 @@
-@using SentinelCloudinho.Pages.Shared
-@layout MainLayout
+@page "/"
+@using Microsoft.JSInterop
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IJSRuntime JS
+@inject NavigationManager NavigationManager
 
 @if (!initialized)
 {
