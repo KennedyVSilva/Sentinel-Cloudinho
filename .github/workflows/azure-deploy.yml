@@ -1,27 +1,29 @@
-name: Deploy to Azure
-
-on:
-  push:
-    branches:
-      - main
-
 jobs:
-  deploy:
-    runs-on: windows-latest
+  build:
+    runs-on: windows-2022
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-dotnet@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '8.x'
+    - name: Clear NuGet cache
+      run: dotnet nuget locals all --clear
     - name: Restore dependencies
-      run: dotnet restore --force --no-cache
+      run: dotnet restore
     - name: Build
-      run: dotnet build --configuration Release SentinelCloudinho.sln
+      run: dotnet build --configuration Release
     - name: Publish
-      run: dotnet publish --configuration Release SentinelCloudinho.sln -o ./publish
-    - name: Deploy to Azure Web App
+      run: dotnet publish --configuration Release --output publish
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: publish
+        path: publish
+    - name: Deploy to Azure
       uses: azure/webapps-deploy@v2
       with:
-        app-name: sentinelcloudinho-kennedy  # Substitua pelo nome do seu App Service
+        app-name: sentinelteste
+        slot-name: production
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ./publish
+        package: publish
