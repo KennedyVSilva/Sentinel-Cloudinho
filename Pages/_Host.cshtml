@@ -1,3 +1,24 @@
-<div class="main-container">
-    @Body
-</div>
+@page "/"
+@namespace SentinelCloudinho.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8" />
+    <title>Sentinel Cloudinho</title>
+    <base href="~/" />
+    <link rel="stylesheet" href="css/site.css" />
+    <link href="SentinelCloudinho.styles.css" rel="stylesheet" />
+</head>
+<body>
+    <app>
+        <component type="typeof(App)" render-mode="ServerPrerendered" />
+    </app>
+
+    <script src="_framework/blazor.server.js"></script>
+</body>
+</html>

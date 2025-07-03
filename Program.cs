@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using SentinelDoCloudinho.Services; // ou seu namespace correto
